@@ -126,7 +126,8 @@ static const char* kVideoQueueLabel = "com.google.mediapipe.example.videoQueue";
         lastHandSize = CGSizeMake(rect.width(), rect.height());
 //        [_delegate handTracker: self didOutputPalmSize:CGSizeMake(rect.width(), rect.height())];
     } else if (streamName == kHandednessOutputStream) {
-        NSLog(@"handedness stream");
+        //TODO: report the left/right
+//        NSLog(@"handedness stream");
     }
 }
 
