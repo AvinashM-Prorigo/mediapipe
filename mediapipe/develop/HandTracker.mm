@@ -4,6 +4,7 @@
 #import "mediapipe/objc/MPPLayerRenderer.h"
 #include "mediapipe/framework/formats/landmark.pb.h"
 #include "mediapipe/framework/formats/rect.pb.h"
+#include "mediapipe/framework/formats/classification.pb.h"
 static NSString* const kGraphName = @"hand_tracking_mobile_gpu";
 static const char* kInputStream = "input_video";
 static const char* kRectOutputStream = "hand_rect_from_landmarks";
@@ -12,14 +13,26 @@ static const char* kLandmarksOutputStream = "hand_landmarks";
 static const char* kHandednessOutputStream = "handedness";
 static const char* kVideoQueueLabel = "com.google.mediapipe.example.videoQueue";
 
+typedef NS_ENUM(NSInteger, HTHandedness) {
+    HTHandednessUnknown,
+    HTHandednessRight,
+    HTHandednessLeft,
+};
+
 @interface HandTracker() <MPPGraphDelegate>
 {
     CGSize lastHandSize;
 }
 @property(nonatomic) MPPGraph* mediapipeGraph;
+@property (nonatomic) HTHandedness currentHandedness;
+@property (nonatomic) float currentHandScore;
 @end
 
-@interface Landmark()
+@interface HTHandInfo ()
+- (instancetype)initWithLandmarks:(NSArray *)landmarks andHandSize:(CGSize)handSize andIsRightHand:(BOOL)isRightHand andHandednessScore:(float)score;
+@end
+
+@interface HTLandmark()
 - (instancetype)initWithX:(float)x y:(float)y z:(float)z;
 @end
 
@@ -105,29 +118,34 @@ static const char* kVideoQueueLabel = "com.google.mediapipe.example.videoQueue";
         if (packet.IsEmpty()) { return; }
         const auto& landmarks = packet.Get<::mediapipe::NormalizedLandmarkList>();
                 
-        //        for (int i = 0; i < landmarks.landmark_size(); ++i) {
-        //            NSLog(@"\tLandmark[%d]: (%f, %f, %f)", i, landmarks.landmark(i).x(),
-        //                  landmarks.landmark(i).y(), landmarks.landmark(i).z());
-        //        }
-        NSMutableArray<Landmark *> *result = [NSMutableArray array];
+        NSMutableArray<HTLandmark *> *result = [NSMutableArray array];
+        
         for (int i = 0; i < landmarks.landmark_size(); ++i) {
-            Landmark *landmark = [[Landmark alloc] initWithX:landmarks.landmark(i).x()
-                                                           y:landmarks.landmark(i).y()
-                                                           z:landmarks.landmark(i).z()];
+            HTLandmark *landmark = [[HTLandmark alloc] initWithX:landmarks.landmark(i).x()
+                                                             y:landmarks.landmark(i).y()
+                                                             z:landmarks.landmark(i).z()];
             [result addObject:landmark];
         }
-        if (!CGSizeEqualToSize(lastHandSize, CGSizeZero)) {
-            [_delegate handTracker: self didOutputLandmarks: result andHandSize:lastHandSize];
+        if (!CGSizeEqualToSize(lastHandSize, CGSizeZero) && self.currentHandedness != HTHandednessUnknown) {
+            HTHandInfo *info = [[HTHandInfo alloc] initWithLandmarks:result.copy andHandSize:lastHandSize andIsRightHand:self.currentHandedness == HTHandednessRight andHandednessScore:self.currentHandedness];
+            
+            [_delegate handTracker:self didOutputHandInfo:info];
         }
     }
     else if (streamName == kRectOutputStream) {
         const auto rect = packet.Get<::mediapipe::NormalizedRect>();
 
         lastHandSize = CGSizeMake(rect.width(), rect.height());
-//        [_delegate handTracker: self didOutputPalmSize:CGSizeMake(rect.width(), rect.height())];
     } else if (streamName == kHandednessOutputStream) {
-        //TODO: report the left/right
-//        NSLog(@"handedness stream");
+        const auto classificationList = packet.Get<::mediapipe::ClassificationList>();
+        
+        if (classificationList.classification_size() > 0) {
+            auto classification = classificationList.classification(0);
+            
+            //the length of "right" is 5 and "left" is 4........T_T
+            _currentHandedness = classification.label().size() == 5 ? HTHandednessRight : HTHandednessLeft;
+            _currentHandScore = classification.score();
+        }
     }
 }
 
@@ -139,8 +157,21 @@ static const char* kVideoQueueLabel = "com.google.mediapipe.example.videoQueue";
 
 @end
 
+@implementation HTHandInfo
 
-@implementation Landmark
+- (instancetype)initWithLandmarks:(NSArray *)landmarks andHandSize:(CGSize)handSize andIsRightHand:(BOOL)isRightHand andHandednessScore:(float)score {
+    if (self = [super init]) {
+        _landmarks = landmarks;
+        _handSize = handSize;
+        _isRightHand = isRightHand;
+        _handednessScore = score;
+    }
+    return self;
+}
+
+@end
+
+@implementation HTLandmark
 
 - (instancetype)initWithX:(float)x y:(float)y z:(float)z
 {
