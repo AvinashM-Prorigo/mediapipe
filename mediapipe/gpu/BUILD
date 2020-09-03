@@ -16,7 +16,7 @@ load("//mediapipe/gpu:metal.bzl", "metal_library")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
 load("//mediapipe/framework/port:build_config.bzl", "mediapipe_cc_proto_library")
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
 
@@ -430,6 +430,13 @@ cc_library(
         ],
         "//mediapipe:macos": [
             "gl_texture_buffer_pool.h",
+        ],
+    }),
+    copts = select({
+        "//conditions:default": [],
+        "//mediapipe:apple": [
+            "-x objective-c++",
+            "-fobjc-arc",
         ],
     }),
     visibility = ["//visibility:public"],

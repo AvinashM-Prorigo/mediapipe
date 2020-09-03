@@ -144,9 +144,12 @@ we record ten intervals of half a second each. This can be overridden by adding
     ```bash
     profiler_config {
       trace_enabled: true
-      trace_log_path: "/sdcard/profiles"
+      trace_log_path: "/sdcard/profiles/"
     }
     ```
+
+    Note: The forward slash at the end of the `trace_log_path` is necessary for
+    indicating that `profiles` is a directory (that *should* exist).
 
 *   Download the trace files from the device.
 
@@ -294,7 +297,7 @@ trace_log_margin_usec
     in trace log output. This margin allows time for events to be appended to
     the TraceBuffer.
 
-trace_log_duration_events
+trace_log_instant_events
 :   False specifies an event for each calculator invocation. True specifies a
     separate event for each start and finish time.
 
